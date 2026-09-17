@@ -24,7 +24,7 @@ type Watcher struct {
 	Ticker Ticker
 }
 
-func NewWatcher(path string, reporter Reporter, fileSystem FileSystem, ticker Ticker) (*Watcher, error) {
+func NewWatcher(ctx context.Context,path string, reporter Reporter, fileSystem FileSystem, ticker Ticker) (*Watcher, error) {
 	if path == ""{
 		return nil, fmt.Errorf("path is empty")
 	}
@@ -41,7 +41,7 @@ func NewWatcher(path string, reporter Reporter, fileSystem FileSystem, ticker Ti
 		return nil, fmt.Errorf("ticker is not init")
 	}
 
-	snapshot, err := fileSystem.Scan(path)
+	snapshot, err := fileSystem.Scan(ctx, path)
 	if err != nil{
 		return nil, fmt.Errorf("failed to initialize snapshot: %w", err)
 	}
@@ -64,7 +64,7 @@ func (w *Watcher) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-w.Ticker.C():
-			currentSnapshot, err := w.FileSystem.Scan(w.Path)
+			currentSnapshot, err := w.FileSystem.Scan(ctx, w.Path)
 			if err != nil {
 				if errors.Is(err, os.ErrNotExist) && w.FolderState != FolderStateUnavailable{
 					w.FolderState = FolderStateUnavailable

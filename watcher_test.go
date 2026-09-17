@@ -119,7 +119,7 @@ type MockFileSystem struct {
 	scanCount int
 }
 
-func (mfs *MockFileSystem) Scan(path string) (map[string]FileSnapshot, error) {
+func (mfs *MockFileSystem) Scan(ctx context.Context, path string) (map[string]FileSnapshot, error) {
 	if mfs.scanCount >= len(mfs.Snapshots) {
 		return nil, fmt.Errorf("no more snapshots available")
 	}
@@ -158,6 +158,7 @@ func (mr *MockReport) ReportFolderState(FolderState FolderState, path string) {
 }
 
 func TestChange(t *testing.T) {
+	context := context.Background()
 	testReporter := ConsoleReporter{}
 	fakeTicker, err := NewWatcherTicker(time.Minute)
 	assert.NoError(t, err)
@@ -194,7 +195,7 @@ func TestChange(t *testing.T) {
 		},
 	}
 
-	testWatcher, err := NewWatcher("test-path", testReporter, &mockFileSystem, fakeTicker)
+	testWatcher, err := NewWatcher(context, "test-path", testReporter, &mockFileSystem, fakeTicker)
 	assert.NoError(t, err)
 
 	changes := testWatcher.check(currentSnapshot)
@@ -210,6 +211,7 @@ func TestChange(t *testing.T) {
 }
 
 func TestWatchContrutor(t *testing.T) {
+	context := context.Background()
 	testReporter := ConsoleReporter{}
 	fakeTicker, err := NewWatcherTicker(time.Minute)
 	assert.NoError(t, err)
@@ -245,40 +247,32 @@ func TestWatchContrutor(t *testing.T) {
 		},
 	}
 
-	testWatcher, err := NewWatcher("test-path", testReporter, &mockFileSystem, fakeTicker)
+	testWatcher, err := NewWatcher(context, "test-path", testReporter, &mockFileSystem, fakeTicker)
 	assert.NoError(t, err)
 	assert.Equal(t, testWatcher.PreviousSnapshot, expectedInitalState)
 }
 
 func TestWatchContrutor_ScanError(t *testing.T) {
+	context := context.Background()
 	testReporter := ConsoleReporter{}
 	fakeTicker, err := NewWatcherTicker(time.Minute)
 	assert.NoError(t, err)
 	mockFileSystem := MockFileSystem{
 		Snapshots: []ScanResult{
 			{
-				Snapshot: map[string]FileSnapshot{
-					"a.txt": {
-						Name: "a.txt",
-					},
-					"c.txt": {
-						Name: "c.txt",
-					},
-					"d.txt": {
-						Name: "d.txt",
-						Size: 100,
-					},
-				},
+				Err: fmt.Errorf("error while scaning"),
 			},
 		},
 	}
 
-	testWatcher, err := NewWatcher("test-path", testReporter, &mockFileSystem, fakeTicker)
+	testWatcher, err := NewWatcher(context, "test-path", testReporter, &mockFileSystem, fakeTicker)
 	assert.Error(t, err)
 	assert.Nil(t, testWatcher)
 }
 
 func TestWatcherRun(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	mockTicker := MockTicker{
 		channel: make(chan time.Time),
 	}
@@ -314,11 +308,10 @@ func TestWatcherRun(t *testing.T) {
 			},
 		},
 	}
-	testWatcher, err := NewWatcher("test-path", &testReporter, &mockFileSystem, mockTicker)
+	testWatcher, err := NewWatcher(ctx, "test-path", &testReporter, &mockFileSystem, mockTicker)
 	assert.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	
 	done := make(chan struct{})
 	go func() {
 		testWatcher.Run(ctx)
@@ -349,6 +342,8 @@ func TestWatcherRun(t *testing.T) {
 }
 
 func TestWatcherScanErrorRecovery(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	mockTicker := MockTicker{
 		channel: make(chan time.Time),
 	}
@@ -389,11 +384,10 @@ func TestWatcherScanErrorRecovery(t *testing.T) {
 		},
 	}
 
-	testWatcher, err := NewWatcher("test-path", &testReporter, &mockFileSystem, mockTicker)
+	testWatcher, err := NewWatcher(ctx, "test-path", &testReporter, &mockFileSystem, mockTicker)
 	assert.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+
 	done := make(chan struct{})
 	go func() {
 		testWatcher.Run(ctx)
@@ -402,6 +396,10 @@ func TestWatcherScanErrorRecovery(t *testing.T) {
 
 	mockTicker.channel <- time.Now()
 	mockTicker.channel <- time.Now()
+
+	
+	cancel()
+	<-done
 
 	wantedSnapshot := map[string]FileSnapshot{
 		"a.txt": {
@@ -415,9 +413,6 @@ func TestWatcherScanErrorRecovery(t *testing.T) {
 			Size: 200,
 		},
 	}
-	cancel()
-	<-done
-
 	assert.Equal(t, testWatcher.PreviousSnapshot, wantedSnapshot)
 	assert.Len(t, testReporter.Changes.Added, 1)
 	assert.Len(t, testReporter.Changes.Removed, 1)
