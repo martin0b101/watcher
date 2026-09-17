@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -26,12 +29,19 @@ func main()  {
 
 	fmt.Printf("\nWatching %s...\n\n", folderPath)
 
-	reporter := NewConsoleReporter(nil)
-	watcher, err := NewWatcher(folderPath, 3*time.Second, reporter, OSFileSystem{})
-
+	watcherTicker, err := NewWatcherTicker(3*time.Second)
 	if err != nil{
-		fmt.Printf("error while running watcher: %v/n", err)
+		fmt.Printf("error while init ticker %v\n", err)
 		return
 	}
-	watcher.Run()
+	watcher, err := NewWatcher(folderPath, ConsoleReporter{}, OSFileSystem{}, watcherTicker)
+
+	if err != nil{
+		fmt.Printf("error while running watcher: %v\n", err)
+		return
+	}
+
+	ctx, stopFunc := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stopFunc()
+	watcher.Run(ctx)
 }

@@ -1,19 +1,19 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"time"
 )
 
 type Watcher struct {
 	Path string
 	PreviousSnapshot map[string]FileSnapshot
-	Interval time.Duration
 	Reporter Reporter
 	FileSystem FileSystem
+	Ticker Ticker
 }
 
-func NewWatcher(path string, interval time.Duration, reporter Reporter, fileSystem FileSystem) (*Watcher, error) {
+func NewWatcher(path string, reporter Reporter, fileSystem FileSystem, ticker Ticker) (*Watcher, error) {
 	if path == ""{
 		return nil, fmt.Errorf("path is empty")
 	}
@@ -26,6 +26,10 @@ func NewWatcher(path string, interval time.Duration, reporter Reporter, fileSyst
 		return nil, fmt.Errorf("fileSystem is not init")
 	}
 
+	if ticker == nil {
+		return nil, fmt.Errorf("ticker is not init")
+	}
+
 	snapshot, err := fileSystem.Scan(path)
 	if err != nil{
 		return nil, fmt.Errorf("failed to initialize snapshot: %w", err)
@@ -34,23 +38,28 @@ func NewWatcher(path string, interval time.Duration, reporter Reporter, fileSyst
 	return &Watcher{
 		Path: path,
 		PreviousSnapshot: snapshot,
-		Interval: interval,
 		Reporter: reporter,
 		FileSystem: fileSystem,
+		Ticker: ticker,
 	}, nil
 }
 
 
-func (w *Watcher) Run() {
+func (w *Watcher) Run(ctx context.Context) {
+	defer w.Ticker.Stop()
 	for {
-		time.Sleep(w.Interval)
-		currentSnapshot, err := w.FileSystem.Scan(w.Path)
-		if err != nil{
-			fmt.Printf("error scaning: %v\n", err)
-			continue
+		select{
+		case <-ctx.Done():
+			return
+		case <-w.Ticker.C():
+			currentSnapshot, err := w.FileSystem.Scan(w.Path)
+			if err != nil{
+				fmt.Printf("error scaning: %v\n", err)
+				continue
+			}
+			changes := w.check(currentSnapshot)
+			w.Reporter.Report(changes)
 		}
-		changes := w.check(currentSnapshot)
-		w.Reporter.Report(changes)
 	}
 }
 
