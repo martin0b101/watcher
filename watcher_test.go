@@ -109,24 +109,28 @@ func TestCompareModifiedFile_Size(t *testing.T) {
 	assert.Empty(t, added)
 }
 
+type ScanResult struct {
+	Snapshot map[string]FileSnapshot
+	Err      error
+}
+
 type MockFileSystem struct {
-	Snapshots   []map[string]FileSnapshot
-	scanCount   int
-	ReturnError bool
+	Snapshots []ScanResult
+	scanCount int
 }
 
 func (mfs *MockFileSystem) Scan(path string) (map[string]FileSnapshot, error) {
-	if mfs.ReturnError {
-		return nil, fmt.Errorf("somting wrong wile scanning")
-	}
-
 	if mfs.scanCount >= len(mfs.Snapshots) {
 		return nil, fmt.Errorf("no more snapshots available")
 	}
 
 	snapshotToReturn := mfs.Snapshots[mfs.scanCount]
+
 	mfs.scanCount += 1
-	return snapshotToReturn, nil
+	if snapshotToReturn.Snapshot != nil {
+		return snapshotToReturn.Snapshot, nil
+	}
+	return nil, snapshotToReturn.Err
 }
 
 type MockTicker struct {
@@ -149,26 +153,32 @@ func (mr *MockReport) Report(changes Changes) {
 	mr.Changes = changes
 }
 
+func (mr *MockReport) ReportFolderState(FolderState FolderState, path string) {
+
+}
+
 func TestChange(t *testing.T) {
 	testReporter := ConsoleReporter{}
 	fakeTicker, err := NewWatcherTicker(time.Minute)
 	assert.NoError(t, err)
 	mockFileSystem := MockFileSystem{
-		Snapshots: []map[string]FileSnapshot{
+		Snapshots: []ScanResult{
 			{
-				"a.txt": FileSnapshot{
-					Name: "a.txt",
-				},
-				"c.txt": FileSnapshot{
-					Name: "c.txt",
-				},
-				"d.txt": FileSnapshot{
-					Name: "d.txt",
-					Size: 100,
+				Snapshot: map[string]FileSnapshot{
+
+					"a.txt": {
+						Name: "a.txt",
+					},
+					"c.txt": {
+						Name: "c.txt",
+					},
+					"d.txt": {
+						Name: "d.txt",
+						Size: 100,
+					},
 				},
 			},
 		},
-		ReturnError: false,
 	}
 
 	currentSnapshot := map[string]FileSnapshot{
@@ -204,21 +214,22 @@ func TestWatchContrutor(t *testing.T) {
 	fakeTicker, err := NewWatcherTicker(time.Minute)
 	assert.NoError(t, err)
 	mockFileSystem := MockFileSystem{
-		Snapshots: []map[string]FileSnapshot{
+		Snapshots: []ScanResult{
 			{
-				"a.txt": FileSnapshot{
-					Name: "a.txt",
-				},
-				"c.txt": FileSnapshot{
-					Name: "c.txt",
-				},
-				"d.txt": FileSnapshot{
-					Name: "d.txt",
-					Size: 100,
+				Snapshot: map[string]FileSnapshot{
+					"a.txt": {
+						Name: "a.txt",
+					},
+					"c.txt": {
+						Name: "c.txt",
+					},
+					"d.txt": {
+						Name: "d.txt",
+						Size: 100,
+					},
 				},
 			},
 		},
-		ReturnError: false,
 	}
 
 	expectedInitalState := map[string]FileSnapshot{
@@ -244,21 +255,22 @@ func TestWatchContrutor_ScanError(t *testing.T) {
 	fakeTicker, err := NewWatcherTicker(time.Minute)
 	assert.NoError(t, err)
 	mockFileSystem := MockFileSystem{
-		Snapshots: []map[string]FileSnapshot{
+		Snapshots: []ScanResult{
 			{
-				"a.txt": FileSnapshot{
-					Name: "a.txt",
-				},
-				"c.txt": FileSnapshot{
-					Name: "c.txt",
-				},
-				"d.txt": FileSnapshot{
-					Name: "d.txt",
-					Size: 100,
+				Snapshot: map[string]FileSnapshot{
+					"a.txt": {
+						Name: "a.txt",
+					},
+					"c.txt": {
+						Name: "c.txt",
+					},
+					"d.txt": {
+						Name: "d.txt",
+						Size: 100,
+					},
 				},
 			},
 		},
-		ReturnError: true,
 	}
 
 	testWatcher, err := NewWatcher("test-path", testReporter, &mockFileSystem, fakeTicker)
@@ -272,33 +284,35 @@ func TestWatcherRun(t *testing.T) {
 	}
 	testReporter := MockReport{}
 	mockFileSystem := MockFileSystem{
-		Snapshots: []map[string]FileSnapshot{
+		Snapshots: []ScanResult{
 			{
-				"a.txt": FileSnapshot{
-					Name: "a.txt",
+				Snapshot: map[string]FileSnapshot{
+					"a.txt": {
+						Name: "a.txt",
+					},
+					"c.txt": {
+						Name: "c.txt",
+					},
+					"d.txt": {
+						Name: "d.txt",
+						Size: 100,
+					},
 				},
-				"c.txt": FileSnapshot{
-					Name: "c.txt",
-				},
-				"d.txt": FileSnapshot{
-					Name: "d.txt",
-					Size: 100,
-				},
-			},
-			{
-				"a.txt": FileSnapshot{
-					Name: "a.txt",
-				},
-				"b.txt": FileSnapshot{
-					Name: "b.txt",
-				},
-				"d.txt": FileSnapshot{
-					Name: "d.txt",
-					Size: 200,
+			}, {
+				Snapshot: map[string]FileSnapshot{
+					"a.txt": {
+						Name: "a.txt",
+					},
+					"b.txt": {
+						Name: "b.txt",
+					},
+					"d.txt": {
+						Name: "d.txt",
+						Size: 200,
+					},
 				},
 			},
 		},
-		ReturnError: false,
 	}
 	testWatcher, err := NewWatcher("test-path", &testReporter, &mockFileSystem, mockTicker)
 	assert.NoError(t, err)
@@ -306,11 +320,87 @@ func TestWatcherRun(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan struct{})
-	go func(){
+	go func() {
 		testWatcher.Run(ctx)
 		done <- struct{}{}
 	}()
-	
+
+	mockTicker.channel <- time.Now()
+
+	wantedSnapshot := map[string]FileSnapshot{
+		"a.txt": {
+			Name: "a.txt",
+		},
+		"b.txt": {
+			Name: "b.txt",
+		},
+		"d.txt": {
+			Name: "d.txt",
+			Size: 200,
+		},
+	}
+	cancel()
+	<-done
+
+	assert.Equal(t, testWatcher.PreviousSnapshot, wantedSnapshot)
+	assert.Len(t, testReporter.Changes.Added, 1)
+	assert.Len(t, testReporter.Changes.Removed, 1)
+	assert.Len(t, testReporter.Changes.Modified, 1)
+}
+
+func TestWatcherScanErrorRecovery(t *testing.T) {
+	mockTicker := MockTicker{
+		channel: make(chan time.Time),
+	}
+	testReporter := MockReport{}
+	mockFileSystem := MockFileSystem{
+		Snapshots: []ScanResult{
+			{
+				Snapshot: map[string]FileSnapshot{
+					"a.txt": {
+						Name: "a.txt",
+					},
+					"c.txt": {
+						Name: "c.txt",
+					},
+					"d.txt": {
+						Name: "d.txt",
+						Size: 100,
+					},
+				},
+			},
+			{
+				Err: fmt.Errorf("error while scaining"),
+			},
+			{
+				Snapshot: map[string]FileSnapshot{
+					"a.txt": {
+						Name: "a.txt",
+					},
+					"b.txt": {
+						Name: "b.txt",
+					},
+					"d.txt": {
+						Name: "d.txt",
+						Size: 200,
+					},
+				},
+			},
+		},
+	}
+
+	testWatcher, err := NewWatcher("test-path", &testReporter, &mockFileSystem, mockTicker)
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		testWatcher.Run(ctx)
+		done <- struct{}{}
+	}()
+
+	mockTicker.channel <- time.Now()
 	mockTicker.channel <- time.Now()
 
 	wantedSnapshot := map[string]FileSnapshot{

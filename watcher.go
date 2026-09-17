@@ -2,11 +2,22 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
 )
+
+type FolderState int 
+
+const (
+	FolderStateAvailable FolderState = iota
+	FolderStateUnavailable
+)
+
 
 type Watcher struct {
 	Path string
+	FolderState FolderState
 	PreviousSnapshot map[string]FileSnapshot
 	Reporter Reporter
 	FileSystem FileSystem
@@ -37,6 +48,7 @@ func NewWatcher(path string, reporter Reporter, fileSystem FileSystem, ticker Ti
 
 	return &Watcher{
 		Path: path,
+		FolderState: FolderStateAvailable,
 		PreviousSnapshot: snapshot,
 		Reporter: reporter,
 		FileSystem: fileSystem,
@@ -53,9 +65,16 @@ func (w *Watcher) Run(ctx context.Context) {
 			return
 		case <-w.Ticker.C():
 			currentSnapshot, err := w.FileSystem.Scan(w.Path)
-			if err != nil{
-				fmt.Printf("error scaning: %v\n", err)
+			if err != nil {
+				if errors.Is(err, os.ErrNotExist) && w.FolderState != FolderStateUnavailable{
+					w.FolderState = FolderStateUnavailable
+					w.Reporter.ReportFolderState(w.FolderState, w.Path)
+				}
 				continue
+			}
+			if w.FolderState == FolderStateUnavailable{
+				w.FolderState = FolderStateAvailable
+				w.Reporter.ReportFolderState(w.FolderState, w.Path)
 			}
 			changes := w.check(currentSnapshot)
 			w.Reporter.Report(changes)
