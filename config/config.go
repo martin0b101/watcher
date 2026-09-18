@@ -44,20 +44,20 @@ func Parse(args []string) (*Config, error) {
 	outputFlag := OutputFormatFlag{
 		Value: Console,
 	}
-	interval := fs.Duration("interval", 3 * time.Second, "scaning interval in seconds")
+	interval := fs.Duration("interval", 3*time.Second, "scaning interval in seconds")
 	recursive := fs.Bool("recursive", false, "scaning folders recursively")
 	fs.Var(&outputFlag, "output", "output format (e.g. console, json)")
 
-	if len(args) > 2{
+	if len(args) > 1 {
 		err := fs.Parse(args[1:])
-	
-		if err != nil{
+
+		if err != nil {
 			return nil, err
 		}
 	}
 	if fs.NArg() <= 0 {
-        return nil, fmt.Errorf("required arguments missing")
-    }
+		return nil, fmt.Errorf("required arguments missing")
+	}
 
 	return &Config{
 		Path:         fs.Arg(0),

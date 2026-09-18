@@ -1,4 +1,4 @@
-package main
+package reporter
 
 import (
 	"fmt"
@@ -12,19 +12,15 @@ type Changes struct {
 
 type Reporter interface {
 	Report(changes Changes)
-	ReportFolderState(folderState FolderState, path string)
+	ReportMessage(msg string)
 }
 
 type ConsoleReporter struct {
 }
 
 // ReportFolderState implements Reporter.
-func (ConsoleReporter) ReportFolderState(folderState FolderState, path string) {
-	if folderState == FolderStateAvailable{
-		fmt.Printf("Directory available: %s\n", path)
-		return
-	}
-	fmt.Printf("Directory unavailable: %s\n", path)
+func (ConsoleReporter) ReportMessage(msg string) {
+	fmt.Println(msg)
 }
 
 var _ Reporter = ConsoleReporter{}

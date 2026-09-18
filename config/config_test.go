@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDefaultConfig(t *testing.T){
+func TestDefaultConfig(t *testing.T) {
 	args := []string{
 		"watcher", "./incoming",
 	}
@@ -21,7 +21,7 @@ func TestDefaultConfig(t *testing.T){
 	assert.Equal(t, output.OutputFormat, Console)
 }
 
-func TestCustomConfig(t *testing.T){
+func TestCustomConfig(t *testing.T) {
 	args := []string{
 		"watcher", "-output=json", "-interval=5s", "./test-path",
 	}
@@ -35,8 +35,8 @@ func TestCustomConfig(t *testing.T){
 	assert.Equal(t, output.OutputFormat, JSON)
 }
 
-func TestCutomConfig_WithoutEqualSign(t *testing.T){
-		args := []string{
+func TestCutomConfig_WithoutEqualSign(t *testing.T) {
+	args := []string{
 		"watcher", "-output", "json", "-interval", "5s", "./test-path",
 	}
 
@@ -49,7 +49,7 @@ func TestCutomConfig_WithoutEqualSign(t *testing.T){
 	assert.Equal(t, output.OutputFormat, JSON)
 }
 
-func TestCustomConfig_Mixed(t *testing.T){
+func TestCustomConfig_Mixed(t *testing.T) {
 	args := []string{
 		"watcher", "-output", "json", "-interval=5s", "--recursive", "./test-path",
 	}
@@ -63,7 +63,7 @@ func TestCustomConfig_Mixed(t *testing.T){
 	assert.Equal(t, output.OutputFormat, JSON)
 }
 
-func TestConfigError_WrongArg(t *testing.T){
+func TestConfigError_WrongArg(t *testing.T) {
 	args := []string{
 		"watcher", "-output", "yaml", "-interval=5s", "--recursive", "./test-path",
 	}

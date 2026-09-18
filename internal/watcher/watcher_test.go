@@ -1,4 +1,4 @@
-package main
+package watcher
 
 import (
 	"context"
@@ -6,16 +6,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/martin0b101/watcher/internal/filesystem"
+	"github.com/martin0b101/watcher/internal/reporter"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCompateEmpty(t *testing.T) {
-	previous := map[string]FileSnapshot{
+	previous := map[string]filesystem.FileSnapshot{
 		"a.txt": {},
 		"b.txt": {},
 	}
 
-	current := map[string]FileSnapshot{
+	current := map[string]filesystem.FileSnapshot{
 		"a.txt": {},
 		"b.txt": {},
 	}
@@ -28,11 +30,11 @@ func TestCompateEmpty(t *testing.T) {
 }
 
 func TestCompareAddedFile(t *testing.T) {
-	previous := map[string]FileSnapshot{
+	previous := map[string]filesystem.FileSnapshot{
 		"a.txt": {},
 	}
 
-	current := map[string]FileSnapshot{
+	current := map[string]filesystem.FileSnapshot{
 		"a.txt": {},
 		"b.txt": {},
 	}
@@ -46,12 +48,12 @@ func TestCompareAddedFile(t *testing.T) {
 }
 
 func TestCompareRemovedFile(t *testing.T) {
-	previous := map[string]FileSnapshot{
+	previous := map[string]filesystem.FileSnapshot{
 		"a.txt": {},
 		"b.txt": {},
 	}
 
-	current := map[string]FileSnapshot{
+	current := map[string]filesystem.FileSnapshot{
 		"a.txt": {},
 	}
 
@@ -64,14 +66,14 @@ func TestCompareRemovedFile(t *testing.T) {
 }
 
 func TestCompareModifiedFile_ModifiedAt(t *testing.T) {
-	previous := map[string]FileSnapshot{
+	previous := map[string]filesystem.FileSnapshot{
 		"a.txt": {},
 		"b.txt": {
 			ModifiedAt: time.Date(2000, 1, 1, 11, 45, 0, 0, time.UTC),
 		},
 	}
 
-	current := map[string]FileSnapshot{
+	current := map[string]filesystem.FileSnapshot{
 		"a.txt": {},
 		"b.txt": {
 			ModifiedAt: time.Date(2000, 1, 1, 12, 0, 0, 0, time.UTC),
@@ -87,14 +89,14 @@ func TestCompareModifiedFile_ModifiedAt(t *testing.T) {
 }
 
 func TestCompareModifiedFile_Size(t *testing.T) {
-	previous := map[string]FileSnapshot{
+	previous := map[string]filesystem.FileSnapshot{
 		"a.txt": {},
 		"b.txt": {
 			Size: 100,
 		},
 	}
 
-	current := map[string]FileSnapshot{
+	current := map[string]filesystem.FileSnapshot{
 		"a.txt": {},
 		"b.txt": {
 			Size: 200,
@@ -110,7 +112,7 @@ func TestCompareModifiedFile_Size(t *testing.T) {
 }
 
 type ScanResult struct {
-	Snapshot map[string]FileSnapshot
+	Snapshot map[string]filesystem.FileSnapshot
 	Err      error
 }
 
@@ -119,7 +121,7 @@ type MockFileSystem struct {
 	scanCount int
 }
 
-func (mfs *MockFileSystem) Scan(ctx context.Context, path string) (map[string]FileSnapshot, error) {
+func (mfs *MockFileSystem) Scan(ctx context.Context, path string) (map[string]filesystem.FileSnapshot, error) {
 	if mfs.scanCount >= len(mfs.Snapshots) {
 		return nil, fmt.Errorf("no more snapshots available")
 	}
@@ -146,26 +148,26 @@ func (mt MockTicker) Stop() {
 }
 
 type MockReport struct {
-	Changes Changes
+	Changes reporter.Changes
 }
 
-func (mr *MockReport) Report(changes Changes) {
+func (mr *MockReport) Report(changes reporter.Changes) {
 	mr.Changes = changes
 }
 
-func (mr *MockReport) ReportFolderState(FolderState FolderState, path string) {
+func (mr *MockReport) ReportMessage(msg string) {
 
 }
 
 func TestChange(t *testing.T) {
 	context := context.Background()
-	testReporter := ConsoleReporter{}
+	testReporter := reporter.ConsoleReporter{}
 	fakeTicker, err := NewWatcherTicker(time.Minute)
 	assert.NoError(t, err)
 	mockFileSystem := MockFileSystem{
 		Snapshots: []ScanResult{
 			{
-				Snapshot: map[string]FileSnapshot{
+				Snapshot: map[string]filesystem.FileSnapshot{
 
 					"a.txt": {
 						Name: "a.txt",
@@ -182,7 +184,7 @@ func TestChange(t *testing.T) {
 		},
 	}
 
-	currentSnapshot := map[string]FileSnapshot{
+	currentSnapshot := map[string]filesystem.FileSnapshot{
 		"a.txt": {
 			Name: "a.txt",
 		},
@@ -212,13 +214,13 @@ func TestChange(t *testing.T) {
 
 func TestWatchContrutor(t *testing.T) {
 	context := context.Background()
-	testReporter := ConsoleReporter{}
+	testReporter := reporter.ConsoleReporter{}
 	fakeTicker, err := NewWatcherTicker(time.Minute)
 	assert.NoError(t, err)
 	mockFileSystem := MockFileSystem{
 		Snapshots: []ScanResult{
 			{
-				Snapshot: map[string]FileSnapshot{
+				Snapshot: map[string]filesystem.FileSnapshot{
 					"a.txt": {
 						Name: "a.txt",
 					},
@@ -234,7 +236,7 @@ func TestWatchContrutor(t *testing.T) {
 		},
 	}
 
-	expectedInitalState := map[string]FileSnapshot{
+	expectedInitalState := map[string]filesystem.FileSnapshot{
 		"a.txt": {
 			Name: "a.txt",
 		},
@@ -254,7 +256,7 @@ func TestWatchContrutor(t *testing.T) {
 
 func TestWatchContrutor_ScanError(t *testing.T) {
 	context := context.Background()
-	testReporter := ConsoleReporter{}
+	testReporter := reporter.ConsoleReporter{}
 	fakeTicker, err := NewWatcherTicker(time.Minute)
 	assert.NoError(t, err)
 	mockFileSystem := MockFileSystem{
@@ -280,7 +282,7 @@ func TestWatcherRun(t *testing.T) {
 	mockFileSystem := MockFileSystem{
 		Snapshots: []ScanResult{
 			{
-				Snapshot: map[string]FileSnapshot{
+				Snapshot: map[string]filesystem.FileSnapshot{
 					"a.txt": {
 						Name: "a.txt",
 					},
@@ -293,7 +295,7 @@ func TestWatcherRun(t *testing.T) {
 					},
 				},
 			}, {
-				Snapshot: map[string]FileSnapshot{
+				Snapshot: map[string]filesystem.FileSnapshot{
 					"a.txt": {
 						Name: "a.txt",
 					},
@@ -311,7 +313,6 @@ func TestWatcherRun(t *testing.T) {
 	testWatcher, err := NewWatcher(ctx, "test-path", &testReporter, &mockFileSystem, mockTicker)
 	assert.NoError(t, err)
 
-	
 	done := make(chan struct{})
 	go func() {
 		testWatcher.Run(ctx)
@@ -320,7 +321,7 @@ func TestWatcherRun(t *testing.T) {
 
 	mockTicker.channel <- time.Now()
 
-	wantedSnapshot := map[string]FileSnapshot{
+	wantedSnapshot := map[string]filesystem.FileSnapshot{
 		"a.txt": {
 			Name: "a.txt",
 		},
@@ -351,7 +352,7 @@ func TestWatcherScanErrorRecovery(t *testing.T) {
 	mockFileSystem := MockFileSystem{
 		Snapshots: []ScanResult{
 			{
-				Snapshot: map[string]FileSnapshot{
+				Snapshot: map[string]filesystem.FileSnapshot{
 					"a.txt": {
 						Name: "a.txt",
 					},
@@ -368,7 +369,7 @@ func TestWatcherScanErrorRecovery(t *testing.T) {
 				Err: fmt.Errorf("error while scaining"),
 			},
 			{
-				Snapshot: map[string]FileSnapshot{
+				Snapshot: map[string]filesystem.FileSnapshot{
 					"a.txt": {
 						Name: "a.txt",
 					},
@@ -387,7 +388,6 @@ func TestWatcherScanErrorRecovery(t *testing.T) {
 	testWatcher, err := NewWatcher(ctx, "test-path", &testReporter, &mockFileSystem, mockTicker)
 	assert.NoError(t, err)
 
-
 	done := make(chan struct{})
 	go func() {
 		testWatcher.Run(ctx)
@@ -397,11 +397,10 @@ func TestWatcherScanErrorRecovery(t *testing.T) {
 	mockTicker.channel <- time.Now()
 	mockTicker.channel <- time.Now()
 
-	
 	cancel()
 	<-done
 
-	wantedSnapshot := map[string]FileSnapshot{
+	wantedSnapshot := map[string]filesystem.FileSnapshot{
 		"a.txt": {
 			Name: "a.txt",
 		},

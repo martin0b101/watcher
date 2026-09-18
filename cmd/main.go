@@ -3,23 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/martin0b101/watcher/config"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
+
+	"github.com/martin0b101/watcher/config"
+
+	"github.com/martin0b101/watcher/internal/filesystem"
+	"github.com/martin0b101/watcher/internal/reporter"
+	"github.com/martin0b101/watcher/internal/watcher"
 )
-
-type FileSnapshot struct {
-	Name       string
-	ModifiedAt time.Time
-	Size       int64
-}
-
-// because the method doesn't modify f, so there's no reason to use a pointer receiver.
-func (f FileSnapshot) IsModified(other FileSnapshot) bool {
-	return f.ModifiedAt.After(other.ModifiedAt) || f.Size != other.Size
-}
 
 func main() {
 	config, err := config.Parse(os.Args)
@@ -41,22 +34,22 @@ func main() {
 	watcher.Run(ctx)
 }
 
-func createWatcher(ctx context.Context, cfg config.Config) (*Watcher, error) {
-	watcherTicker, err := NewWatcherTicker(cfg.Interval)
+func createWatcher(ctx context.Context, cfg config.Config) (*watcher.Watcher, error) {
+	watcherTicker, err := watcher.NewWatcherTicker(cfg.Interval)
 	if err != nil {
 		return nil, err
 	}
 
-	var reporter Reporter
+	var rpt reporter.Reporter
 	switch cfg.OutputFormat {
 	case config.Console:
-		reporter = ConsoleReporter{}
+		rpt = reporter.ConsoleReporter{}
 	case config.JSON:
-		fmt.Println("JSON output is not supported right now, fallback to console output")
-		reporter = ConsoleReporter{}
+		rpt = reporter.ConsoleReporter{}
+		rpt.ReportMessage("JSON output is not supported right now, fallback to console output")
 	}
 
-	watcher, err := NewWatcher(ctx, cfg.Path, reporter, OSFileSystem{
+	watcher, err := watcher.NewWatcher(ctx, cfg.Path, rpt, filesystem.OSFileSystem{
 		Recursive: cfg.Recursive,
 	}, watcherTicker)
 	if err != nil {
