@@ -6,6 +6,8 @@ type FileSnapshot struct {
 	Name       string
 	ModifiedAt time.Time
 	Size       int64
+	Format     string
+	FullPath string
 }
 
 // because the method doesn't modify f, so there's no reason to use a pointer receiver.

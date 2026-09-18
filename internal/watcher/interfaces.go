@@ -9,6 +9,7 @@ import (
 
 type FileSystem interface {
 	Scan(ctx context.Context, path string) (map[string]model.FileSnapshot, error)
+	Move(ctx context.Context, sourcePath string, destinationPath string) error
 }
 
 type Ticker interface {
@@ -19,4 +20,8 @@ type Ticker interface {
 type Reporter interface {
 	Report(changes model.Changes)
 	ReportMessage(msg string)
+}
+
+type Processor interface{
+	Process(ctx context.Context, files []model.FileSnapshot) 
 }

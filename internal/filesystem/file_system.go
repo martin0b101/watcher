@@ -3,6 +3,7 @@ package filesystem
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -69,9 +70,32 @@ func scanFolder(ctx context.Context, files []os.DirEntry, basePath string, curre
 			Name:       relPath,
 			ModifiedAt: info.ModTime(),
 			Size:       info.Size(),
+			Format:     filepath.Ext(info.Name()),
+			FullPath: fullPath,
 		}
 	}
 	return currentSnapshot, nil
+}
+
+
+func (osfs OSFileSystem) Move(ctx context.Context,sourcePath string, destinationPath string) error {
+	if ctx.Err() != nil{
+		return ctx.Err()
+	}
+	
+	destDir := filepath.Dir(destinationPath)
+	
+	err := os.MkdirAll(destDir, 0755)
+	if err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+	
+	err = os.Rename(sourcePath, destinationPath)
+	if err != nil {
+		return err 
+	}
+
+	return nil
 }
 
 func MergeMaps[K comparable, V any](map1, map2 map[K]V) map[K]V {

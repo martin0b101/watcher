@@ -22,11 +22,11 @@ func TestCompateEmpty(t *testing.T) {
 		"b.txt": {},
 	}
 
-	added, removed, modified := compare(current, previous)
+	changes := compare(current, previous)
 
-	assert.Empty(t, added)
-	assert.Empty(t, removed)
-	assert.Empty(t, modified)
+	assert.Empty(t, changes.Added)
+	assert.Empty(t, changes.Removed)
+	assert.Empty(t, changes.Modified)
 }
 
 func TestCompareAddedFile(t *testing.T) {
@@ -39,7 +39,8 @@ func TestCompareAddedFile(t *testing.T) {
 		"b.txt": {},
 	}
 
-	added, removed, modified := compare(current, previous)
+	changes := compare(current, previous)
+	added, removed, modified := changes.Added, changes.Removed, changes.Modified
 
 	assert.Len(t, added, 1)
 	assert.Contains(t, added, "b.txt")
@@ -57,7 +58,8 @@ func TestCompareRemovedFile(t *testing.T) {
 		"a.txt": {},
 	}
 
-	added, removed, modified := compare(current, previous)
+	changes := compare(current, previous)
+	added, removed, modified := changes.Added, changes.Removed, changes.Modified
 
 	assert.Len(t, removed, 1)
 	assert.Contains(t, removed, "b.txt")
@@ -80,7 +82,8 @@ func TestCompareModifiedFile_ModifiedAt(t *testing.T) {
 		},
 	}
 
-	added, removed, modified := compare(current, previous)
+	changes := compare(current, previous)
+	added, removed, modified := changes.Added, changes.Removed, changes.Modified
 
 	assert.Len(t, modified, 1)
 	assert.Contains(t, modified, "b.txt")
@@ -103,7 +106,8 @@ func TestCompareModifiedFile_Size(t *testing.T) {
 		},
 	}
 
-	added, removed, modified := compare(current, previous)
+	changes := compare(current, previous)
+	added, removed, modified := changes.Added, changes.Removed, changes.Modified
 
 	assert.Len(t, modified, 1)
 	assert.Contains(t, modified, "b.txt")
@@ -121,6 +125,13 @@ type MockFileSystem struct {
 	scanCount int
 }
 
+type MockProcessor struct {
+}
+
+func (mp MockProcessor) Process(ctx context.Context, files []model.FileSnapshot){
+	return
+}
+
 func (mfs *MockFileSystem) Scan(ctx context.Context, path string) (map[string]model.FileSnapshot, error) {
 	if mfs.scanCount >= len(mfs.Snapshots) {
 		return nil, fmt.Errorf("no more snapshots available")
@@ -133,6 +144,10 @@ func (mfs *MockFileSystem) Scan(ctx context.Context, path string) (map[string]mo
 		return snapshotToReturn.Snapshot, nil
 	}
 	return nil, snapshotToReturn.Err
+}
+
+func (mfs *MockFileSystem) Move(ctx context.Context, source string, dest string) error{
+	return nil
 }
 
 type MockTicker struct {
@@ -163,6 +178,7 @@ func TestChange(t *testing.T) {
 	context := context.Background()
 	testReporter := reporter.ConsoleReporter{}
 	fakeTicker, err := NewWatcherTicker(time.Minute)
+	mockProcessor := MockProcessor{}
 	assert.NoError(t, err)
 	mockFileSystem := MockFileSystem{
 		Snapshots: []ScanResult{
@@ -197,7 +213,7 @@ func TestChange(t *testing.T) {
 		},
 	}
 
-	testWatcher, err := NewWatcher(context, "test-path", testReporter, &mockFileSystem, fakeTicker)
+	testWatcher, err := NewWatcher(context, "test-path", testReporter, &mockFileSystem, mockProcessor, fakeTicker)
 	assert.NoError(t, err)
 
 	changes := testWatcher.check(currentSnapshot)
@@ -236,6 +252,8 @@ func TestWatchContrutor(t *testing.T) {
 		},
 	}
 
+	fileProcessor := MockProcessor{}
+
 	expectedInitalState := map[string]model.FileSnapshot{
 		"a.txt": {
 			Name: "a.txt",
@@ -249,7 +267,7 @@ func TestWatchContrutor(t *testing.T) {
 		},
 	}
 
-	testWatcher, err := NewWatcher(context, "test-path", testReporter, &mockFileSystem, fakeTicker)
+	testWatcher, err := NewWatcher(context, "test-path", testReporter, &mockFileSystem, fileProcessor, fakeTicker)
 	assert.NoError(t, err)
 	assert.Equal(t, testWatcher.previousSnapshot, expectedInitalState)
 }
@@ -258,6 +276,7 @@ func TestWatchContrutor_ScanError(t *testing.T) {
 	context := context.Background()
 	testReporter := reporter.ConsoleReporter{}
 	fakeTicker, err := NewWatcherTicker(time.Minute)
+	mockProcessor := MockProcessor{}
 	assert.NoError(t, err)
 	mockFileSystem := MockFileSystem{
 		Snapshots: []ScanResult{
@@ -267,7 +286,8 @@ func TestWatchContrutor_ScanError(t *testing.T) {
 		},
 	}
 
-	testWatcher, err := NewWatcher(context, "test-path", testReporter, &mockFileSystem, fakeTicker)
+
+	testWatcher, err := NewWatcher(context, "test-path", testReporter, &mockFileSystem, mockProcessor, fakeTicker)
 	assert.Error(t, err)
 	assert.Nil(t, testWatcher)
 }
@@ -279,6 +299,7 @@ func TestWatcherRun(t *testing.T) {
 		channel: make(chan time.Time),
 	}
 	testReporter := MockReport{}
+	mockProcessor := MockProcessor{}
 	mockFileSystem := MockFileSystem{
 		Snapshots: []ScanResult{
 			{
@@ -310,7 +331,7 @@ func TestWatcherRun(t *testing.T) {
 			},
 		},
 	}
-	testWatcher, err := NewWatcher(ctx, "test-path", &testReporter, &mockFileSystem, mockTicker)
+	testWatcher, err := NewWatcher(ctx, "test-path", &testReporter, &mockFileSystem, mockProcessor, mockTicker)
 	assert.NoError(t, err)
 
 	done := make(chan struct{})
@@ -348,6 +369,7 @@ func TestWatcherScanErrorRecovery(t *testing.T) {
 	mockTicker := MockTicker{
 		channel: make(chan time.Time),
 	}
+	mockProcessor := MockProcessor{}
 	testReporter := MockReport{}
 	mockFileSystem := MockFileSystem{
 		Snapshots: []ScanResult{
@@ -385,7 +407,7 @@ func TestWatcherScanErrorRecovery(t *testing.T) {
 		},
 	}
 
-	testWatcher, err := NewWatcher(ctx, "test-path", &testReporter, &mockFileSystem, mockTicker)
+	testWatcher, err := NewWatcher(ctx, "test-path", &testReporter, &mockFileSystem, mockProcessor, mockTicker)
 	assert.NoError(t, err)
 
 	done := make(chan struct{})

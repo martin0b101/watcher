@@ -10,6 +10,7 @@ import (
 	"github.com/martin0b101/watcher/config"
 
 	"github.com/martin0b101/watcher/internal/filesystem"
+	"github.com/martin0b101/watcher/internal/processor"
 	"github.com/martin0b101/watcher/internal/reporter"
 	"github.com/martin0b101/watcher/internal/watcher"
 )
@@ -49,9 +50,17 @@ func createWatcher(ctx context.Context, cfg config.Config) (*watcher.Watcher, er
 		rpt.ReportMessage("JSON output is not supported right now, fallback to console output")
 	}
 
-	watcher, err := watcher.NewWatcher(ctx, cfg.Path, rpt, filesystem.OSFileSystem{
+	osFileSystem := filesystem.OSFileSystem{
 		Recursive: cfg.Recursive,
-	}, watcherTicker)
+	}
+
+	fileProcessor, err := processor.NewFileProcessor(osFileSystem)
+	if err != nil {
+		return nil, err
+	}
+
+	watcher, err := watcher.NewWatcher(ctx, cfg.Path, rpt, osFileSystem, fileProcessor,
+	watcherTicker)
 	if err != nil {
 		return nil, err
 	}

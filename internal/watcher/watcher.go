@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/martin0b101/watcher/internal/filesystem"
 	"github.com/martin0b101/watcher/internal/model"
 )
@@ -22,9 +23,10 @@ type Watcher struct {
 	reporter         Reporter
 	fileSystem       FileSystem
 	ticker           Ticker
+	processor        Processor
 }
 
-func NewWatcher(ctx context.Context, path string, reporter Reporter, fileSystem FileSystem, ticker Ticker) (*Watcher, error) {
+func NewWatcher(ctx context.Context, path string, reporter Reporter, fileSystem FileSystem, fileProcessor Processor, ticker Ticker) (*Watcher, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -39,6 +41,10 @@ func NewWatcher(ctx context.Context, path string, reporter Reporter, fileSystem 
 
 	if fileSystem == nil {
 		return nil, fmt.Errorf("fileSystem is not init")
+	}
+
+	if fileProcessor == nil {
+		return nil, fmt.Errorf("file processor is nor init")
 	}
 
 	if ticker == nil {
@@ -57,6 +63,7 @@ func NewWatcher(ctx context.Context, path string, reporter Reporter, fileSystem 
 		reporter:         reporter,
 		fileSystem:       fileSystem,
 		ticker:           ticker,
+		processor: fileProcessor,
 	}, nil
 }
 
@@ -81,31 +88,39 @@ func (w *Watcher) Run(ctx context.Context) {
 			}
 			changes := w.check(currentSnapshot)
 			w.reporter.Report(changes)
+			w.processor.Process(ctx, changes.Added)
 		}
 	}
 }
 
 func (w *Watcher) check(currentSnapshot map[string]model.FileSnapshot) (changes model.Changes) {
-	changes.Added, changes.Removed, changes.Modified = compare(currentSnapshot, w.previousSnapshot)
+	changes = compare(currentSnapshot, w.previousSnapshot)
 	w.previousSnapshot = currentSnapshot
 	return changes
 }
 
-func compare(currentSnapshot, previousSnapshot map[string]model.FileSnapshot) (added []string, removed []string, modified []string) {
+func compare(currentSnapshot, previousSnapshot map[string]model.FileSnapshot) (changes model.Changes) {
+	removed := []model.FileSnapshot{}
+	added := []model.FileSnapshot{}
+	modified := []model.FileSnapshot{}
 	for previousFile, previousFileContent := range previousSnapshot {
 		currentFile, fileExist := currentSnapshot[previousFile]
 
 		if !fileExist {
-			removed = append(removed, previousFile)
+			removed = append(removed, previousFileContent)
 		} else if currentFile.IsModified(previousFileContent) {
-			modified = append(modified, previousFile)
+			modified = append(modified, previousFileContent)
 		}
 	}
-	for file := range currentSnapshot {
+	for file, fileContent := range currentSnapshot {
 		_, fileExist := previousSnapshot[file]
 		if !fileExist {
-			added = append(added, file)
+			added = append(added, fileContent)
 		}
 	}
-	return added, removed, modified
+	return model.Changes{
+		Added: added,
+		Modified: modified,
+		Removed: removed,
+	}
 }

@@ -15,12 +15,12 @@ func (ConsoleReporter) ReportMessage(msg string) {
 
 func (cr ConsoleReporter) Report(changes model.Changes) {
 	for _, file := range changes.Added {
-		fmt.Printf("New file: %s\n", file)
+		fmt.Printf("New file: %s\n", file.Name)
 	}
 	for _, file := range changes.Removed {
-		fmt.Printf("Removed: %s\n", file)
+		fmt.Printf("Removed: %s\n", file.Name)
 	}
 	for _, file := range changes.Modified {
-		fmt.Printf("Modified: %s\n", file)
+		fmt.Printf("Modified: %s\n", file.Name)
 	}
 }
