@@ -5,12 +5,6 @@ import (
 	"time"
 )
 
-type Ticker interface {
-	C() <-chan time.Time
-	Stop()
-}
-
-var _ Ticker = WatcherTicker{}
 
 type WatcherTicker struct {
 	Ticker *time.Ticker

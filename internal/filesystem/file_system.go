@@ -4,31 +4,16 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"time"
+
+	"github.com/martin0b101/watcher/internal/model"
 )
 
-type FileSnapshot struct {
-	Name       string
-	ModifiedAt time.Time
-	Size       int64
-}
-
-// because the method doesn't modify f, so there's no reason to use a pointer receiver.
-func (f FileSnapshot) IsModified(other FileSnapshot) bool {
-	return f.ModifiedAt.After(other.ModifiedAt) || f.Size != other.Size
-}
-
-type FileSystem interface {
-	Scan(ctx context.Context, path string) (map[string]FileSnapshot, error)
-}
 
 type OSFileSystem struct {
 	Recursive bool
 }
 
-var _ FileSystem = OSFileSystem{}
-
-func (osfs OSFileSystem) Scan(ctx context.Context, path string) (map[string]FileSnapshot, error) {
+func (osfs OSFileSystem) Scan(ctx context.Context, path string) (map[string]model.FileSnapshot, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -39,8 +24,8 @@ func (osfs OSFileSystem) Scan(ctx context.Context, path string) (map[string]File
 	return scanFolder(ctx, files, path, path, osfs.Recursive)
 }
 
-func scanFolder(ctx context.Context, files []os.DirEntry, basePath string, currentPath string, recursive bool) (map[string]FileSnapshot, error) {
-	currentSnapshot := make(map[string]FileSnapshot)
+func scanFolder(ctx context.Context, files []os.DirEntry, basePath string, currentPath string, recursive bool) (map[string]model.FileSnapshot, error) {
+	currentSnapshot := make(map[string]model.FileSnapshot)
 	for _, file := range files {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
@@ -72,7 +57,7 @@ func scanFolder(ctx context.Context, files []os.DirEntry, basePath string, curre
 		if err != nil {
 			return nil, err
 		}
-		currentSnapshot[relPath] = FileSnapshot{
+		currentSnapshot[relPath] = model.FileSnapshot{
 			Name:       relPath,
 			ModifiedAt: info.ModTime(),
 			Size:       info.Size(),

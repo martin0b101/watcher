@@ -2,18 +2,9 @@ package reporter
 
 import (
 	"fmt"
+
+	"github.com/martin0b101/watcher/internal/model"
 )
-
-type Changes struct {
-	Added    []string
-	Removed  []string
-	Modified []string
-}
-
-type Reporter interface {
-	Report(changes Changes)
-	ReportMessage(msg string)
-}
 
 type ConsoleReporter struct {
 }
@@ -23,9 +14,7 @@ func (ConsoleReporter) ReportMessage(msg string) {
 	fmt.Println(msg)
 }
 
-var _ Reporter = ConsoleReporter{}
-
-func (cr ConsoleReporter) Report(changes Changes) {
+func (cr ConsoleReporter) Report(changes model.Changes) {
 	for _, file := range changes.Added {
 		fmt.Printf("New file: %s\n", file)
 	}

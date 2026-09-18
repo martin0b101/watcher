@@ -6,8 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/martin0b101/watcher/internal/filesystem"
-	"github.com/martin0b101/watcher/internal/reporter"
+	"github.com/martin0b101/watcher/internal/model"
 )
 
 type FolderState int
@@ -20,13 +19,13 @@ const (
 type Watcher struct {
 	Path             string
 	FolderState      FolderState
-	PreviousSnapshot map[string]filesystem.FileSnapshot
-	Reporter         reporter.Reporter
-	FileSystem       filesystem.FileSystem
+	PreviousSnapshot map[string]model.FileSnapshot
+	Reporter         Reporter
+	FileSystem       FileSystem
 	Ticker           Ticker
 }
 
-func NewWatcher(ctx context.Context, path string, reporter reporter.Reporter, fileSystem filesystem.FileSystem, ticker Ticker) (*Watcher, error) {
+func NewWatcher(ctx context.Context, path string, reporter Reporter, fileSystem FileSystem, ticker Ticker) (*Watcher, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -87,13 +86,13 @@ func (w *Watcher) Run(ctx context.Context) {
 	}
 }
 
-func (w *Watcher) check(currentSnapshot map[string]filesystem.FileSnapshot) (changes reporter.Changes) {
+func (w *Watcher) check(currentSnapshot map[string]model.FileSnapshot) (changes model.Changes) {
 	changes.Added, changes.Removed, changes.Modified = compare(currentSnapshot, w.PreviousSnapshot)
 	w.PreviousSnapshot = currentSnapshot
 	return changes
 }
 
-func compare(currentSnapshot, previousSnapshot map[string]filesystem.FileSnapshot) (added []string, removed []string, modified []string) {
+func compare(currentSnapshot, previousSnapshot map[string]model.FileSnapshot) (added []string, removed []string, modified []string) {
 	for previousFile, previousFileContent := range previousSnapshot {
 		currentFile, fileExist := currentSnapshot[previousFile]
 

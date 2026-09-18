@@ -40,7 +40,7 @@ func createWatcher(ctx context.Context, cfg config.Config) (*watcher.Watcher, er
 		return nil, err
 	}
 
-	var rpt reporter.Reporter
+	var rpt watcher.Reporter
 	switch cfg.OutputFormat {
 	case config.Console:
 		rpt = reporter.ConsoleReporter{}
