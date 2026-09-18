@@ -4,25 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-
+	"github.com/martin0b101/watcher/internal/filesystem"
 	"github.com/martin0b101/watcher/internal/model"
 )
 
-type FolderState int
+type folderState int
 
 const (
-	FolderStateAvailable FolderState = iota
-	FolderStateUnavailable
+	folderStateAvailable folderState = iota
+	folderStateUnavailable
 )
 
 type Watcher struct {
-	Path             string
-	FolderState      FolderState
-	PreviousSnapshot map[string]model.FileSnapshot
-	Reporter         Reporter
-	FileSystem       FileSystem
-	Ticker           Ticker
+	path             string
+	folderState      folderState
+	previousSnapshot map[string]model.FileSnapshot
+	reporter         Reporter
+	fileSystem       FileSystem
+	ticker           Ticker
 }
 
 func NewWatcher(ctx context.Context, path string, reporter Reporter, fileSystem FileSystem, ticker Ticker) (*Watcher, error) {
@@ -52,43 +51,43 @@ func NewWatcher(ctx context.Context, path string, reporter Reporter, fileSystem 
 	}
 
 	return &Watcher{
-		Path:             path,
-		FolderState:      FolderStateAvailable,
-		PreviousSnapshot: snapshot,
-		Reporter:         reporter,
-		FileSystem:       fileSystem,
-		Ticker:           ticker,
+		path:             path,
+		folderState:      folderStateAvailable,
+		previousSnapshot: snapshot,
+		reporter:         reporter,
+		fileSystem:       fileSystem,
+		ticker:           ticker,
 	}, nil
 }
 
 func (w *Watcher) Run(ctx context.Context) {
-	defer w.Ticker.Stop()
+	defer w.ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-w.Ticker.C():
-			currentSnapshot, err := w.FileSystem.Scan(ctx, w.Path)
+		case <-w.ticker.C():
+			currentSnapshot, err := w.fileSystem.Scan(ctx, w.path)
 			if err != nil {
-				if errors.Is(err, os.ErrNotExist) && w.FolderState != FolderStateUnavailable {
-					w.FolderState = FolderStateUnavailable
-					w.Reporter.ReportMessage(fmt.Sprintf("Directory unavailable: %s", w.Path))
+				if errors.Is(err, filesystem.ErrFolderUnavailable) && w.folderState != folderStateUnavailable {
+					w.folderState = folderStateUnavailable
+					w.reporter.ReportMessage(fmt.Sprintf("Directory unavailable: %s", w.path))
 				}
 				continue
 			}
-			if w.FolderState == FolderStateUnavailable {
-				w.FolderState = FolderStateAvailable
-				w.Reporter.ReportMessage(fmt.Sprintf("Directory available: %s", w.Path))
+			if w.folderState == folderStateUnavailable {
+				w.folderState = folderStateAvailable
+				w.reporter.ReportMessage(fmt.Sprintf("Directory available: %s", w.path))
 			}
 			changes := w.check(currentSnapshot)
-			w.Reporter.Report(changes)
+			w.reporter.Report(changes)
 		}
 	}
 }
 
 func (w *Watcher) check(currentSnapshot map[string]model.FileSnapshot) (changes model.Changes) {
-	changes.Added, changes.Removed, changes.Modified = compare(currentSnapshot, w.PreviousSnapshot)
-	w.PreviousSnapshot = currentSnapshot
+	changes.Added, changes.Removed, changes.Modified = compare(currentSnapshot, w.previousSnapshot)
+	w.previousSnapshot = currentSnapshot
 	return changes
 }
 

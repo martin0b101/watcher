@@ -9,7 +9,6 @@ import (
 type ConsoleReporter struct {
 }
 
-// ReportFolderState implements Reporter.
 func (ConsoleReporter) ReportMessage(msg string) {
 	fmt.Println(msg)
 }

@@ -2,12 +2,14 @@ package filesystem
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 
 	"github.com/martin0b101/watcher/internal/model"
 )
 
+var ErrFolderUnavailable = errors.New("folder unavailable")
 
 type OSFileSystem struct {
 	Recursive bool
@@ -19,6 +21,9 @@ func (osfs OSFileSystem) Scan(ctx context.Context, path string) (map[string]mode
 	}
 	files, err := os.ReadDir(path)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist){
+			return nil, ErrFolderUnavailable
+		}
 		return nil, err
 	}
 	return scanFolder(ctx, files, path, path, osfs.Recursive)
@@ -39,6 +44,9 @@ func scanFolder(ctx context.Context, files []os.DirEntry, basePath string, curre
 			}
 			subFiles, err := os.ReadDir(fullPath)
 			if err != nil {
+				if errors.Is(err, os.ErrNotExist){
+					return nil, ErrFolderUnavailable
+				}
 				return nil, err
 			}
 			newCurrentSnapshot, err := scanFolder(ctx, subFiles, basePath, fullPath, true)

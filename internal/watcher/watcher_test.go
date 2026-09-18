@@ -209,7 +209,7 @@ func TestChange(t *testing.T) {
 	assert.Contains(t, changes.Removed, "c.txt")
 	assert.Contains(t, changes.Modified, "d.txt")
 
-	assert.Equal(t, currentSnapshot, testWatcher.PreviousSnapshot)
+	assert.Equal(t, currentSnapshot, testWatcher.previousSnapshot)
 }
 
 func TestWatchContrutor(t *testing.T) {
@@ -251,7 +251,7 @@ func TestWatchContrutor(t *testing.T) {
 
 	testWatcher, err := NewWatcher(context, "test-path", testReporter, &mockFileSystem, fakeTicker)
 	assert.NoError(t, err)
-	assert.Equal(t, testWatcher.PreviousSnapshot, expectedInitalState)
+	assert.Equal(t, testWatcher.previousSnapshot, expectedInitalState)
 }
 
 func TestWatchContrutor_ScanError(t *testing.T) {
@@ -336,7 +336,7 @@ func TestWatcherRun(t *testing.T) {
 	cancel()
 	<-done
 
-	assert.Equal(t, testWatcher.PreviousSnapshot, wantedSnapshot)
+	assert.Equal(t, testWatcher.previousSnapshot, wantedSnapshot)
 	assert.Len(t, testReporter.Changes.Added, 1)
 	assert.Len(t, testReporter.Changes.Removed, 1)
 	assert.Len(t, testReporter.Changes.Modified, 1)
@@ -412,7 +412,7 @@ func TestWatcherScanErrorRecovery(t *testing.T) {
 			Size: 200,
 		},
 	}
-	assert.Equal(t, testWatcher.PreviousSnapshot, wantedSnapshot)
+	assert.Equal(t, testWatcher.previousSnapshot, wantedSnapshot)
 	assert.Len(t, testReporter.Changes.Added, 1)
 	assert.Len(t, testReporter.Changes.Removed, 1)
 	assert.Len(t, testReporter.Changes.Modified, 1)

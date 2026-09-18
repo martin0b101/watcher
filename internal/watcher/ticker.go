@@ -7,7 +7,7 @@ import (
 
 
 type WatcherTicker struct {
-	Ticker *time.Ticker
+	ticker *time.Ticker
 }
 
 func NewWatcherTicker(interval time.Duration) (*WatcherTicker, error) {
@@ -16,16 +16,16 @@ func NewWatcherTicker(interval time.Duration) (*WatcherTicker, error) {
 	}
 	ticker := time.NewTicker(interval)
 	return &WatcherTicker{
-		Ticker: ticker,
+		ticker: ticker,
 	}, nil
 }
 
 // C implements Ticker.
 func (wt WatcherTicker) C() <-chan time.Time {
-	return wt.Ticker.C
+	return wt.ticker.C
 }
 
 // Stop implements Ticker.
 func (wt WatcherTicker) Stop() {
-	wt.Ticker.Stop()
+	wt.ticker.Stop()
 }
